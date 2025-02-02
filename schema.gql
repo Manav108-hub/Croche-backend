@@ -1,0 +1,176 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type AuthResponse {
+  access_token: String!
+  user: User!
+}
+
+input ChangePasswordInput {
+  confirmPassword: String!
+  currentPassword: String!
+  newPassword: String!
+}
+
+input CreateProductInput {
+  category: String!
+  description: String
+  images: [ImageInput!]!
+  name: String!
+  prices: [PriceInput!]!
+  stock: Int!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+type Image {
+  createdAt: DateTime!
+  format: String!
+  height: Int!
+  id: ID!
+  productId: String
+  public_id: String!
+  url: String!
+  width: Int!
+}
+
+input ImageInput {
+  id: ID!
+}
+
+input LoginInput {
+  email: String!
+  password: String!
+}
+
+type Mutation {
+  changePassword(input: ChangePasswordInput!): User!
+  createProduct(input: CreateProductInput!): Product!
+  deleteProduct(id: String!): Product!
+  deleteUser(id: String!): Boolean!
+  login(input: LoginInput!): AuthResponse!
+  register(input: RegisterUserInput!): AuthResponse!
+  toggleUserAdmin(id: String!, isAdmin: Boolean!): User!
+  updateProduct(input: UpdateProductInput!): Product!
+  updateUser(input: UpdateUserInput!): User!
+  updateUserAdmin(id: String!, input: UpdateUserInput!): User!
+  updateUserDetails(input: UpdateUserDetailsInput!): UserDetails!
+  uploadImage(file: Upload!): ProductImage!
+}
+
+type Price {
+  createdAt: DateTime!
+  id: ID!
+  productId: ID!
+  size: Size!
+  updatedAt: DateTime!
+  value: Float!
+}
+
+input PriceInput {
+  size: Size!
+  value: Float!
+}
+
+type Product {
+  category: String!
+  createdAt: DateTime!
+  description: String
+  id: ID!
+  images: [Image!]!
+  name: String!
+  prices: [Price!]!
+  stock: Int!
+  updatedAt: DateTime!
+}
+
+type ProductImage {
+  createdAt: DateTime!
+  format: String!
+  height: Int!
+  id: ID!
+  public_id: String!
+  url: String!
+  width: Int!
+}
+
+type Query {
+  me: User!
+  product(id: String!): Product!
+  products: [Product!]!
+  userByEmail(email: String!): User!
+  userWithOrders: User!
+}
+
+input RegisterUserInput {
+  email: String!
+  isAdmin: Boolean = false
+  name: String!
+  password: String!
+}
+
+"""Available product sizes"""
+enum Size {
+  """Large size"""
+  large
+
+  """Medium size"""
+  medium
+
+  """Small size"""
+  small
+}
+
+input UpdateProductInput {
+  category: String
+  description: String
+  id: ID!
+  name: String
+  stock: Int
+}
+
+input UpdateUserDetailsInput {
+  address: String
+  city: String
+  country: String
+  phone: String
+  pincode: Int
+}
+
+input UpdateUserInput {
+  email: String
+  id: ID!
+  isAdmin: Boolean
+  name: String
+  password: String
+}
+
+"""The `Upload` scalar type represents a file upload."""
+scalar Upload
+
+type User {
+  createdAt: DateTime!
+  email: String!
+  id: ID!
+  isAdmin: Boolean!
+  name: String!
+  updatedAt: DateTime!
+  userDetails: UserDetails
+}
+
+type UserDetails {
+  address: String!
+  city: String!
+  country: String!
+  createdAt: DateTime!
+  id: ID!
+  phone: String!
+  pincode: Int!
+  updatedAt: DateTime!
+  user: User!
+  userId: String!
+}
