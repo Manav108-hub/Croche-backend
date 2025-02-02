@@ -16,6 +16,9 @@ import { TimeoutInterceptor } from './common/interceptors/timeout.interceptor';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { SecurityMiddleware } from './common/middleware/security.middleware';
 import { ImageModule } from './image/image.module';
+import { CartService } from './cart/cart.service';
+import { CartResolver } from './cart/cart.resolver';
+import { PubsubserviceService } from './pubsubservice/pubsubservice.service';
 
 @Module({
   imports: [
@@ -51,6 +54,9 @@ import { ImageModule } from './image/image.module';
       provide: APP_FILTER,
       useClass: AllExceptionsFilter,
     },
+    CartService,
+    CartResolver,
+    PubsubserviceService,
   ],
 })
 export class AppModule implements NestModule {

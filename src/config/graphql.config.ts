@@ -4,6 +4,9 @@ import { GraphQLError } from 'graphql';
 export const graphqlConfig: ApolloDriverConfig = {
     autoSchemaFile: 'schema.gql',
     sortSchema: true,
+    subscriptions: {
+        'graphql-ws': true, // Enable WebSockets
+      },
     playground: process.env.NODE_ENV !== 'production',
     introspection: process.env.NODE_ENV !== 'production',
     context: ({ req, res }) => ({ req, res }),
