@@ -2,9 +2,38 @@
 # THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
 # ------------------------------------------------------
 
+input AddToCartInput {
+  productId: String!
+  quantity: Int!
+  size: Size!
+  userId: String!
+}
+
 type AuthResponse {
   access_token: String!
   user: User!
+}
+
+type Cart {
+  createdAt: DateTime!
+  id: ID!
+  isOrdered: Boolean!
+  items: [CartItem!]!
+  total: Float!
+  updatedAt: DateTime!
+  userId: String!
+}
+
+type CartItem {
+  cartId: String!
+  createdAt: DateTime!
+  id: ID!
+  price: Float!
+  product: Product!
+  productId: String!
+  quantity: Int!
+  size: Size!
+  updatedAt: DateTime!
 }
 
 input ChangePasswordInput {
@@ -48,12 +77,14 @@ input LoginInput {
 }
 
 type Mutation {
+  addToCart(input: AddToCartInput!): Cart!
   changePassword(input: ChangePasswordInput!): User!
   createProduct(input: CreateProductInput!): Product!
   deleteProduct(id: String!): Product!
   deleteUser(id: String!): Boolean!
   login(input: LoginInput!): AuthResponse!
   register(input: RegisterUserInput!): AuthResponse!
+  removeCartItem(cartItemId: String!): Cart!
   toggleUserAdmin(id: String!, isAdmin: Boolean!): User!
   updateProduct(input: UpdateProductInput!): Product!
   updateUser(input: UpdateUserInput!): User!
@@ -99,6 +130,7 @@ type ProductImage {
 }
 
 type Query {
+  getCart(userId: String!): Cart
   me: User!
   product(id: String!): Product!
   products: [Product!]!
@@ -123,6 +155,10 @@ enum Size {
 
   """Small size"""
   small
+}
+
+type Subscription {
+  cartUpdated: Cart!
 }
 
 input UpdateProductInput {
