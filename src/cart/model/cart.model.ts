@@ -1,5 +1,4 @@
-import { ObjectType, Field, ID, Int } from '@nestjs/graphql';
-import { Product } from 'src/product/models/product.model';
+import { ObjectType, Field, ID, Int, Float } from '@nestjs/graphql';
 import { CartItem } from './cart-item.model';
 
 
@@ -16,6 +15,9 @@ export class Cart {
 
   @Field()
   isOrdered: boolean;
+
+  @Field(() => Float)
+  total: number;
 
   @Field(() => Date)
   createdAt: Date;
