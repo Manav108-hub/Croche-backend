@@ -38,7 +38,7 @@ export class CartResolver {
   }
 
   @ResolveField(() => Float)
-  total(@Parent() cart: any) {
-    return cart.items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0);
+  total(@Parent() cart: Cart) {
+    return cart.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   }
 }
