@@ -43,11 +43,10 @@ export class CartService {
     try {
       await this.prisma.cartItem.upsert({
         where: {
-          cartItem_cartId_productId_size_unique: {
-            cartId: cart.id,
-            productId: input.productId,
-            size: input.size,
-          },
+          id: cart.items.find(item => 
+            item.productId === input.productId && 
+            item.size === input.size
+          )?.id ?? '',
         },
         update: { quantity: { increment: input.quantity } },
         create: {
@@ -59,7 +58,7 @@ export class CartService {
         },
       });
     } catch (error) {
-      throw new Error('Field to update cart.');
+      throw new Error('Failed to update cart.');
     }
 
     const updatedCart = await this.prisma.cart.findUnique({
