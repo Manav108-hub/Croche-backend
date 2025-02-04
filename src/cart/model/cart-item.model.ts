@@ -1,4 +1,4 @@
-import { ObjectType, Field, ID, Int, registerEnumType } from '@nestjs/graphql';
+import { ObjectType, Field, ID, Int, registerEnumType, Float } from '@nestjs/graphql';
 import { Product } from 'src/product/models/product.model';
 import { Size } from '@prisma/client';
 
@@ -31,6 +31,9 @@ export class CartItem {
 
   @Field()
   productId: string;
+
+  @Field(() => Float)
+  price: number;
 
   @Field(() => Int)
   quantity: number;
