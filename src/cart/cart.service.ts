@@ -41,22 +41,26 @@ export class CartService {
     if (!price) throw new NotFoundException('Price not found for selected size');
 
     try {
-      await this.prisma.cartItem.upsert({
-        where: {
-          id: cart.items.find(item => 
-            item.productId === input.productId && 
-            item.size === input.size
-          )?.id ?? '',
-        },
-        update: { quantity: { increment: input.quantity } },
-        create: {
-          cartId: cart.id,
-          productId: input.productId,
-          size: input.size,
-          price: price.value,
-          quantity: input.quantity,
-        },
-      });
+      const existingItem = cart.items.find(item => 
+        item.productId === input.productId && 
+        item.size === input.size
+      )
+      if (existingItem) {
+        await this.prisma.cartItem.update({
+          where: { id: existingItem.id },
+          data: { quantity: { increment: input.quantity } },
+        });
+      } else {
+        await this.prisma.cartItem.create({
+          data: {
+            cartId: cart.id,
+            productId: input.productId,
+            size: input.size,
+            price: price.value,
+            quantity: input.quantity,
+          },
+        });
+      }
     } catch (error) {
       throw new Error('Failed to update cart.');
     }
