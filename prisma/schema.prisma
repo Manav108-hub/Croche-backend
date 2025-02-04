@@ -62,8 +62,9 @@ model CartItem {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([cartId, productId, size])
-  @@unique([cardId, productId, size])
+  @@unique([cartId, productId, size], name: "cartItem_cartId_productId_size_unique")
+
+  
 }
 
 model Order {

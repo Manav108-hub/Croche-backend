@@ -43,7 +43,7 @@ export class CartService {
     try {
       await this.prisma.cartItem.upsert({
         where: {
-          cartId_productId_size: {
+          cartItem_cartId_productId_size_unique: {
             cartId: cart.id,
             productId: input.productId,
             size: input.size,
