@@ -1,17 +1,14 @@
-import { Resolver, Query, Mutation, Args, Subscription } from '@nestjs/graphql';
+import { Resolver, Query, Mutation, Args, Subscription, ResolveField, Float, Parent } from '@nestjs/graphql';
 import { CartService } from './cart.service';
 import { Cart } from './model/cart.model';
 import { AddToCartInput } from './dto/cart.dto';
-import { PubSub, PubSubEngine } from 'graphql-subscriptions';
-import { PubsubserviceService } from 'src/pubsubservice/pubsubservice.service';
-
-const pubSub: PubSubEngine = new PubSub();  // Ensure it's typed as PubSubEngine
+import { PubSubService } from 'src/pubsub/pubsub.service';
 
 @Resolver(() => Cart)
 export class CartResolver {
     constructor(
         private cartService: CartService,
-        private pubSubService: PubsubserviceService,  // Inject PubSubService
+        private pubSubService: PubSubService
       ) {}
 
   @Query(() => Cart, { nullable: true })
@@ -21,22 +18,27 @@ export class CartResolver {
 
   @Mutation(() => Cart)
   async addToCart(@Args('input') input: AddToCartInput) {
-    const cartItem = await this.cartService.addToCart(input);
-    this.pubSubService.publishEvent('cartUpdated', { cartUpdated: cartItem });
-    return cartItem;
+    const cart = await this.cartService.addToCart(input);
+    this.pubSubService.publishEvent('cartUpdated', { cartUpdated: cart });
+    return cart;
   }
 
-  @Mutation(() => Boolean)
+  @Mutation(() => Cart)
   async removeCartItem(@Args('cartItemId') cartItemId: string) {
-    await this.cartService.removeCartItem(cartItemId);
-    this.pubSubService.publishEvent('cartUpdated', { cartUpdated: null });
-    return true;
+    const cart = await this.cartService.removeCartItem(cartItemId);
+    this.pubSubService.publishEvent('cartUpdated', { cartUpdated: cart });
+    return cart;
   }
 
   @Subscription(() => Cart, {
     resolve: (payload) => payload.cartUpdated,
   })
   cartUpdated() {
-    return this.pubSubService.getAsyncIterator('cartUpdated');  // Now using asyncIterator correctly
+    return this.pubSubService.getAsyncIterator('cartUpdated');
+  }
+
+  @ResolveField(() => Float)
+  total(@Parent() cart: any) {
+    return cart.items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0);
   }
 }

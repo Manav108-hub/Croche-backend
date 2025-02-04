@@ -7,7 +7,7 @@ import { UserModule } from './user/user.module';
 import { ProductModule } from './product/product.module';
 import { ConfigModule } from '@nestjs/config';
 import { GraphQLModule } from '@nestjs/graphql';
-import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
+import { ApolloDriver } from '@nestjs/apollo';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { graphqlConfig } from './config/graphql.config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
@@ -18,7 +18,7 @@ import { SecurityMiddleware } from './common/middleware/security.middleware';
 import { ImageModule } from './image/image.module';
 import { CartService } from './cart/cart.service';
 import { CartResolver } from './cart/cart.resolver';
-import { PubsubserviceService } from './pubsubservice/pubsubservice.service';
+import { PubSubService } from './pubsub/pubsub.service';
 
 @Module({
   imports: [
@@ -56,7 +56,7 @@ import { PubsubserviceService } from './pubsubservice/pubsubservice.service';
     },
     CartService,
     CartResolver,
-    PubsubserviceService,
+    PubSubService,
   ],
 })
 export class AppModule implements NestModule {

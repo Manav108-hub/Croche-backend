@@ -40,18 +40,16 @@ model UserDetails {
   updatedAt DateTime @updatedAt
 }
 
-// New Cart model
 model Cart {
   id        String     @id @default(auto()) @map("_id") @db.ObjectId
   userId    String     @unique @db.ObjectId
   user      User       @relation(fields: [userId], references: [id])
-  items     CartItem[] // 1-many relationship with CartItem
+  items     CartItem[] 
   isOrdered Boolean    @default(false) // New column
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 }
 
-// New CartItem model
 model CartItem {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   cart      Cart     @relation(fields: [cartId], references: [id])
@@ -64,7 +62,8 @@ model CartItem {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([cartId, productId, size]) // Composite index for common queries
+  @@index([cartId, productId, size])
+  @@unique([cardId, productId, size])
 }
 
 model Order {

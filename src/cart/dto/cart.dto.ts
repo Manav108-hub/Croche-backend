@@ -1,6 +1,6 @@
 import { InputType, Field, Int } from '@nestjs/graphql';
 import { IsNotEmpty, IsString, IsInt, Min } from 'class-validator';
-import { Size } from 'src/common/enums/size.enum';
+import { Size } from '@prisma/client';
 
 @InputType()
 export class AddToCartInput {
