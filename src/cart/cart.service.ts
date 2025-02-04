@@ -11,15 +11,16 @@ export class CartService {
   }
 
   async getCartByUserId(userId: string) {
-    const cart = await this.prisma.cart.findUnique({
-      where: { userId },
+    const cart = await this.prisma.cart.findFirst({ // Use findFirst instead of findUnique
+      where: { userId, isOrdered: false },  // Find active cart (not ordered)
       include: { items: { include: { product: true } } },
     });
-
+  
     if (!cart) return null;
     const total = await this.calculateCartTotal(cart);
     return { ...cart, total };
   }
+  
 
   async addToCart(input: AddToCartInput) {
     try {
