@@ -7,7 +7,6 @@ import {
 } from '@nestjs/graphql';
 import { Size } from '@prisma/client';
 
-// Register the Size enum for GraphQL
 registerEnumType(Size, {
   name: 'Size',
   description: 'Available product sizes',
