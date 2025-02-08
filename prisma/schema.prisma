@@ -35,6 +35,7 @@ model UserDetails {
   pincode   Int
   country   String
   phone     String
+  orders    Order[]  // Added this to connect orders to user details
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -66,14 +67,11 @@ model Order {
   id            String      @id @default(auto()) @map("_id") @db.ObjectId
   userId        String      @db.ObjectId
   user          User        @relation(fields: [userId], references: [id])
+  userDetailsId String      @db.ObjectId
+  userDetails   UserDetails @relation(fields: [userDetailsId], references: [id])
   items         OrderItem[]
   totalAmount   Float
   status        OrderStatus @default(pending)
-  address       String      // Storing address directly for order history
-  city          String
-  pincode       Int
-  country       String
-  phone         String
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 }
