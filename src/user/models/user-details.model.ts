@@ -1,5 +1,6 @@
 import { ObjectType, Field, ID, Int } from '@nestjs/graphql';
 import { User } from './user.model';
+import { Order } from '../../order/model/order.model';
 
 @ObjectType()
 export class UserDetails {
@@ -26,6 +27,9 @@ export class UserDetails {
 
   @Field()
   phone: string;
+
+  @Field(() => [Order], { nullable: true }) // Added orders relationship
+  orders?: Order[];
 
   @Field()
   createdAt: Date;

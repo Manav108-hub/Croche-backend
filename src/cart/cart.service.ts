@@ -1,39 +1,40 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { AddToCartInput } from './dto/cart.dto';
-import { Cart, CartItem, Product, Image, Prisma } from '@prisma/client';
+import { AddToCartInput, UpdateCartItemInput } from './dto/cart.dto';
+import { Cart, CartItem, Product, Size, Price, Image } from '@prisma/client';
 
-type ProductWithImages = Product & {
-  images?: Image[];
+type ProductWithDetails = Product & {
+  prices: Price[];
+  images: Image[];
 };
 
 type CartItemWithProduct = CartItem & {
-  product: ProductWithImages;
+  product: ProductWithDetails;
+  prices: Price[];
 };
 
 type CartWithItems = Cart & {
   items: CartItemWithProduct[];
+  total: number;
 };
 
 @Injectable()
 export class CartService {
   constructor(private prisma: PrismaService) {}
 
-  private calculateCartTotal(cart: CartWithItems): number {
-    return cart.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  private calculateCartTotal(items: CartItemWithProduct[]): number {
+    return items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   }
 
   async getCartByUserId(userId: string): Promise<CartWithItems | null> {
-    const cart = await this.prisma.cart.findFirst({
-      where: { 
-        userId,
-        isOrdered: false
-      },
+    const cart = await this.prisma.cart.findUnique({
+      where: { userId },
       include: {
         items: {
           include: {
             product: {
               include: {
+                prices: true,
                 images: true
               }
             }
@@ -41,182 +42,155 @@ export class CartService {
         }
       }
     });
-  
-    if (!cart) return null;
-    
-    return {
-      ...cart,
-      total: this.calculateCartTotal(cart)
-    } as CartWithItems;
+
+    return cart ? { ...cart, total: this.calculateCartTotal(cart.items) } : null;
   }
 
-  async addToCart(input: AddToCartInput): Promise<CartWithItems> {
-    try {
-      // 1. Verify user exists
-      const user = await this.prisma.user.findUnique({
-        where: { id: input.userId }
+  async addToCart(userId: string, input: AddToCartInput): Promise<CartWithItems> {
+    return this.prisma.$transaction(async (tx) => {
+      let cart = await tx.cart.findUnique({
+        where: { userId },
+        include: { items: true }
+      }) || await tx.cart.create({
+        data: { userId },
+        include: { items: true }
+      });
+
+      const product = await tx.product.findUnique({
+        where: { id: input.productId },
+        include: { prices: true }
       });
       
-      if (!user) {
-        throw new NotFoundException(`User with ID ${input.userId} not found`);
-      }
-  
-      // 2. Verify product exists
-      const product = await this.prisma.product.findUnique({
-        where: { id: input.productId }
-      });
+      if (!product) throw new NotFoundException('Product not found');
+      if (product.stock < input.quantity) throw new Error('Insufficient stock');
       
-      if (!product) {
-        throw new NotFoundException(`Product with ID ${input.productId} not found`);
+      const price = product.prices.find(p => p.size === input.size);
+      if (!price) throw new NotFoundException('Selected size not available');
+
+      const existingItem = cart.items.find(item => 
+        item.productId === input.productId && 
+        item.size === input.size
+      );
+
+      const cartItemData = {
+        cartId: cart.id,
+        productId: input.productId,
+        size: input.size,
+        price: price.value,
+        quantity: input.quantity
+      };
+
+      if (existingItem) {
+        await tx.cartItem.update({
+          where: { id: existingItem.id },
+          data: { 
+            quantity: { increment: input.quantity },
+            price: price.value
+          }
+        });
+      } else {
+        await tx.cartItem.create({
+          data: cartItemData
+        });
       }
-  
-      // 3. Find or create cart
-      let cart = await this.prisma.cart.findFirst({
-        where: { 
-          userId: input.userId,
-          isOrdered: false
-        },
-        include: { 
+
+      const updatedCart = await tx.cart.findUniqueOrThrow({
+        where: { id: cart.id },
+        include: {
           items: {
             include: {
               product: {
                 include: {
+                  prices: true,
                   images: true
                 }
               }
             }
-          } 
-        }
-      });
-  
-      if (!cart) {
-        cart = await this.prisma.cart.create({
-          data: { 
-            userId: input.userId, 
-            isOrdered: false,
-          },
-          include: { 
-            items: {
-              include: {
-                product: {
-                  include: {
-                    images: true
-                  }
-                }
-              }
-            } 
           }
-        });
-      }
-  
-      // 4. Find price for the product size
-      const price = await this.prisma.price.findFirst({
-        where: { 
-          productId: input.productId,
-          size: input.size
         }
       });
-  
-      if (!price) {
-        throw new NotFoundException(
-          `Price not found for product ${input.productId} with size ${input.size}`
-        );
-      }
-  
-      try {
-        // 5. Find existing cart item
-        const existingItem = cart.items.find(item => 
-          item.productId === input.productId && 
-          item.size === input.size
-        );
-  
-        if (existingItem) {
-          // 6a. Update existing cart item
-          await this.prisma.cartItem.update({
-            where: { id: existingItem.id },
-            data: { 
-              quantity: { increment: input.quantity }
-            },
-          });
-        } else {
-          // 6b. Create new cart item
-          await this.prisma.cartItem.create({
-            data: {
-              cart: {
-                connect: { id: cart.id }
-              },
-              product: {
-                connect: { id: input.productId }
-              },
-              size: input.size,
-              price: price.value,
-              quantity: input.quantity,
-            },
-          });
-        }
-      } catch (error) {
-        console.error('Error updating/creating cart item:', error);
-        throw new Error(`Failed to update cart item: ${error.message}`);
-      }
-  
-      // 7. Get updated cart
-      const updatedCart = await this.prisma.cart.findUnique({
-        where: { id: cart.id },
-        include: { 
-          items: { 
-            include: { 
-              product: {
-                include: {
-                  images: true
-                }
-              } 
-            } 
-          } 
-        },
-      });
-  
-      if (!updatedCart) {
-        throw new Error('Failed to fetch updated cart');
-      }
-  
+
       return {
         ...updatedCart,
-        total: this.calculateCartTotal(updatedCart)
-      } as CartWithItems;
-    } catch (error) {
-      console.error('Cart update error:', error);
-      throw new Error(`Failed to update cart: ${error.message}`);
-    }
+        total: this.calculateCartTotal(updatedCart.items)
+      };
+    });
   }
 
-  async removeCartItem(cartItemId: string): Promise<CartWithItems> {
-    const cartItem = await this.prisma.cartItem.delete({
-      where: { id: cartItemId },
-      include: { cart: true },
-    });
+  async updateCartItem(userId: string, input: UpdateCartItemInput): Promise<CartWithItems> {
+    return this.prisma.$transaction(async (tx) => {
+      const cartItem = await tx.cartItem.findUnique({
+        where: { id: input.cartItemId },
+        include: { cart: true }
+      });
+      
+      if (!cartItem?.cart || cartItem.cart.userId !== userId) {
+        throw new ForbiddenException('Cart item not found');
+      }
 
-    const updatedCart = await this.prisma.cart.findUnique({
-      where: { id: cartItem.cartId },
-      include: { 
-        items: { 
-          include: { 
-            product: {
-              include: {
-                images: true
+      if (input.newQuantity < 1) throw new Error('Quantity must be at least 1');
+      
+      await tx.cartItem.update({
+        where: { id: input.cartItemId },
+        data: { quantity: input.newQuantity }
+      });
+
+      const updatedCart = await tx.cart.findUniqueOrThrow({
+        where: { id: cartItem.cart.id },
+        include: {
+          items: {
+            include: {
+              product: {
+                include: {
+                  prices: true,
+                  images: true
+                }
               }
-            } 
-          } 
-        } 
-      },
+            }
+          }
+        }
+      });
+
+      return {
+        ...updatedCart,
+        total: this.calculateCartTotal(updatedCart.items)
+      };
     });
+  }
 
-    if (!updatedCart) {
-      throw new Error('Failed to fetch updated cart');
-    }
+  async removeCartItem(userId: string, cartItemId: string): Promise<CartWithItems> {
+    return this.prisma.$transaction(async (tx) => {
+      const cartItem = await tx.cartItem.findUnique({
+        where: { id: cartItemId },
+        include: { cart: true }
+      });
+      
+      if (!cartItem?.cart || cartItem.cart.userId !== userId) {
+        throw new ForbiddenException('Cart item not found');
+      }
 
-    return {
-      ...updatedCart,
-      total: this.calculateCartTotal(updatedCart)
-    } as CartWithItems;
+      await tx.cartItem.delete({ where: { id: cartItemId } });
+
+      const updatedCart = await tx.cart.findUniqueOrThrow({
+        where: { id: cartItem.cart.id },
+        include: {
+          items: {
+            include: {
+              product: {
+                include: {
+                  prices: true,
+                  images: true
+                }
+              }
+            }
+          }
+        }
+      });
+
+      return {
+        ...updatedCart,
+        total: this.calculateCartTotal(updatedCart.items)
+      };
+    });
   }
 }

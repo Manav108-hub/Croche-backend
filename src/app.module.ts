@@ -19,6 +19,7 @@ import { ImageModule } from './image/image.module';
 import { CartService } from './cart/cart.service';
 import { CartResolver } from './cart/cart.resolver';
 import { PubSubService } from './pubsub/pubsub.service';
+import { OrderModule } from './order/order.module';
 
 @Module({
   imports: [
@@ -26,7 +27,7 @@ import { PubSubService } from './pubsub/pubsub.service';
       isGlobal: true,
       cache: true,
     }),
-    ThrottlerModule.forRoot([{
+    ThrottlerModule.forRoot([{ //spammer se bachna 
       ttl: 60,
       limit: 10,
     }]),
@@ -37,7 +38,7 @@ import { PubSubService } from './pubsub/pubsub.service';
     PrismaModule, 
     AuthModule, 
     UserModule, 
-    ProductModule, ImageModule
+    ProductModule, ImageModule, OrderModule
   ],
   controllers: [AppController],
   providers: [

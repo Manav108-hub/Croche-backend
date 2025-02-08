@@ -1,22 +1,6 @@
-import { ObjectType, Field, ID, Int, registerEnumType, Float } from '@nestjs/graphql';
+import { ObjectType, Field, ID, Int, Float } from '@nestjs/graphql';
 import { Product } from 'src/product/models/product.model';
 import { Size } from '@prisma/client';
-
-registerEnumType(Size, {
-  name: 'Size',
-  description: 'Available product sizes',
-  valuesMap: {
-    small: {
-      description: 'Small size',
-    },
-    medium: {
-      description: 'Medium size',
-    },
-    large: {
-      description: 'Large size',
-    },
-  },
-});
 
 @ObjectType()
 export class CartItem {
@@ -33,7 +17,7 @@ export class CartItem {
   productId: string;
 
   @Field(() => Float)
-  price: number;
+  price: number;  // Added price field
 
   @Field(() => Int)
   quantity: number;

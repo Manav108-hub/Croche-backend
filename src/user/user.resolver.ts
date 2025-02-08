@@ -1,5 +1,5 @@
 import { Args, Mutation, Resolver, Query } from '@nestjs/graphql';
-import { UseGuards, NotFoundException } from '@nestjs/common';
+import { UseGuards, NotFoundException, BadRequestException } from '@nestjs/common';
 import { User } from './models/user.model';
 import { UserDetails } from './models/user-details.model';
 import { UserService } from './user.service';
@@ -9,7 +9,6 @@ import { RegisterUserInput } from './dto/register-user.input';
 import { LoginInput } from './dto/login.input';
 import { UpdateUserInput } from './dto/update-user.input';
 import { UpdateUserDetailsInput } from './dto/update-user-details.input';
-import { ChangePasswordInput } from './dto/update-user.input';
 import { GqlAuthGuard } from 'src/auth/guards/gql-auth.guard';
 import { AdminGuard } from 'src/common/guards/admin.guard';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
@@ -42,7 +41,11 @@ export class UserResolver {
     @Query(() => User)
     @UseGuards(GqlAuthGuard)
     async userByEmail(@Args('email') email: string) {
-        return this.userService.findByEmail(email);
+        const user = await this.userService.findByEmail(email);
+        if (!user) {
+            throw new NotFoundException(`User with email ${email} not found`);
+        }
+        return user;
     }
 
     // User Profile Mutations
@@ -69,15 +72,20 @@ export class UserResolver {
     @UseGuards(GqlAuthGuard)
     async changePassword(
         @CurrentUser() user: any,
-        @Args('input') input: ChangePasswordInput,
+        @Args('currentPassword') currentPassword: string,
+        @Args('newPassword') newPassword: string,
+        @Args('confirmPassword') confirmPassword: string,
     ) {
-        if (input.newPassword !== input.confirmPassword) {
-            throw new Error('New password and confirmation do not match');
+        // Validate that newPassword matches confirmPassword
+        if (newPassword !== confirmPassword) {
+            throw new BadRequestException('New password and confirmation do not match');
         }
+
+        // Call the service to change the password
         return this.userService.changePassword(
             user.userId,
-            input.currentPassword,
-            input.newPassword,
+            currentPassword,
+            newPassword,
         );
     }
 
@@ -107,7 +115,7 @@ export class UserResolver {
     ) {
         const input: UpdateUserInput = {
             id,
-            isAdmin
+            isAdmin,
         };
         return this.userService.update(id, input);
     }
@@ -116,6 +124,13 @@ export class UserResolver {
     @Query(() => User)
     @UseGuards(GqlAuthGuard)
     async userWithOrders(@CurrentUser() user: any) {
-        return this.userService.findOne(user.userId);
+        return this.userService.findUserWithOrders(user.userId);
+    }
+
+    // Cart Query
+    @Query(() => User)
+    @UseGuards(GqlAuthGuard)
+    async userWithCart(@CurrentUser() user: any) {
+        return this.userService.findUserWithCart(user.userId);
     }
 }

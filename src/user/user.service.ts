@@ -15,18 +15,65 @@ export class UserService {
                 userDetails: true,
                 orders: {
                     include: {
-                        orderItems: true
+                        items: true  // Corrected to 'items'
                     }
                 }
             }
         });
-
+    
         if (!user) {
             throw new NotFoundException('User not found');
         }
-
+    
         return user;
     }
+
+    async findUserWithCart(id: string) {
+        const user = await this.prisma.user.findUnique({
+            where: { id },
+            include: {
+                userDetails: true,
+                cart: {
+                    include: {
+                        items: {
+                            include: {
+                                product: true, // Include product details in the cart items
+                            },
+                        },
+                    },
+                },
+            },
+        });
+    
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+    
+        return user;
+    }
+    
+
+    
+    // Inside UserService class
+async findUserWithOrders(id: string) {
+    const user = await this.prisma.user.findUnique({
+        where: { id },
+        include: {
+            userDetails: true,
+            orders: {
+                include: {
+                    items: true
+                }
+            }
+        }
+    });
+
+    if (!user) {
+        throw new NotFoundException('User not found');
+    }
+
+    return user;
+}
 
     async findByEmail(email: string) {
         const user = await this.prisma.user.findUnique({
@@ -74,11 +121,12 @@ export class UserService {
                 userDetails: true,
                 orders: {
                     include: {
-                        orderItems: true
+                        items: true  // Corrected to 'items'
                     }
                 }
             }
         });
+        
     }
 
     async updateUserDetails(userId: string, input: UpdateUserDetailsInput) {

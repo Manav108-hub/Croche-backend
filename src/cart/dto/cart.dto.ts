@@ -4,12 +4,7 @@ import { Size } from '@prisma/client';
 
 @InputType()
 export class AddToCartInput {
-  @Field()
-  @IsString()
-  @IsNotEmpty()
-  userId: string;
-
-  @Field()
+  @Field(() => String)
   @IsString()
   @IsNotEmpty()
   productId: string;
@@ -22,4 +17,17 @@ export class AddToCartInput {
   @Field(() => Size)
   @IsEnum(Size)
   size: Size;
+}
+
+@InputType()
+export class UpdateCartItemInput {
+  @Field(() => String)
+  @IsString()
+  @IsNotEmpty()
+  cartItemId: string;
+
+  @Field(() => Int)
+  @IsInt()
+  @Min(1)
+  newQuantity: number;
 }
