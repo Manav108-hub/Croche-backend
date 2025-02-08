@@ -8,14 +8,28 @@ export class OrderService {
 
   async getOrders(): Promise<Order[]> {
     return this.prisma.order.findMany({
-      include: { items: true }, // Fetch OrderItems inside Order
+      include: {
+        items: {
+          include: {
+            product: true // Include product details if needed
+          }
+        },
+        userDetails: true // Include user details if needed
+      }
     });
   }
 
   async getOrderById(id: string): Promise<Order | null> {
     return this.prisma.order.findUnique({
       where: { id },
-      include: { items: true }, // Fetch OrderItems inside Order
+      include: {
+        items: {
+          include: {
+            product: true // Include product details if needed
+          }
+        },
+        userDetails: true // Include user details if needed
+      }
     });
   }
 }

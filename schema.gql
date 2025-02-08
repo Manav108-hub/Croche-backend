@@ -6,7 +6,6 @@ input AddToCartInput {
   productId: String!
   quantity: Int!
   size: Size!
-  userId: String!
 }
 
 type AuthResponse {
@@ -17,7 +16,6 @@ type AuthResponse {
 type Cart {
   createdAt: DateTime!
   id: ID!
-  isOrdered: Boolean!
   items: [CartItem!]!
   total: Float!
   updatedAt: DateTime!
@@ -33,13 +31,8 @@ type CartItem {
   productId: String!
   quantity: Int!
   size: Size!
+  subtotal: Float!
   updatedAt: DateTime!
-}
-
-input ChangePasswordInput {
-  confirmPassword: String!
-  currentPassword: String!
-  newPassword: String!
 }
 
 input CreateProductInput {
@@ -78,7 +71,7 @@ input LoginInput {
 
 type Mutation {
   addToCart(input: AddToCartInput!): Cart!
-  changePassword(input: ChangePasswordInput!): User!
+  changePassword(confirmPassword: String!, currentPassword: String!, newPassword: String!): User!
   createProduct(input: CreateProductInput!): Product!
   deleteProduct(id: String!): Product!
   deleteUser(id: String!): Boolean!
@@ -86,11 +79,45 @@ type Mutation {
   register(input: RegisterUserInput!): AuthResponse!
   removeCartItem(cartItemId: String!): Cart!
   toggleUserAdmin(id: String!, isAdmin: Boolean!): User!
+  updateCartItem(input: UpdateCartItemInput!): Cart!
   updateProduct(input: UpdateProductInput!): Product!
   updateUser(input: UpdateUserInput!): User!
   updateUserAdmin(id: String!, input: UpdateUserInput!): User!
   updateUserDetails(input: UpdateUserDetailsInput!): UserDetails!
   uploadImage(file: Upload!): ProductImage!
+}
+
+type Order {
+  createdAt: DateTime!
+  id: ID!
+  items: [OrderItem!]!
+  status: OrderStatus!
+  totalAmount: Float!
+  updatedAt: DateTime!
+  userDetailsId: String!
+  userId: String!
+}
+
+type OrderItem {
+  createdAt: DateTime!
+  id: ID!
+  orderId: String!
+  price: Float!
+  product: Product
+  productId: String!
+  quantity: Int!
+  size: Size!
+  updatedAt: DateTime!
+}
+
+"""The status of the order"""
+enum OrderStatus {
+  cancelled
+  delivered
+  paid
+  pending
+  processing
+  shipped
 }
 
 type Price {
@@ -130,11 +157,14 @@ type ProductImage {
 }
 
 type Query {
-  getCart(userId: String!): Cart
+  getCart: Cart
   me: User!
+  order(id: String!): Order
+  orders: [Order!]!
   product(id: String!): Product!
   products: [Product!]!
   userByEmail(email: String!): User!
+  userWithCart: User!
   userWithOrders: User!
 }
 
@@ -147,18 +177,18 @@ input RegisterUserInput {
 
 """Available product sizes"""
 enum Size {
-  """Large size"""
   large
-
-  """Medium size"""
   medium
-
-  """Small size"""
   small
 }
 
 type Subscription {
   cartUpdated: Cart!
+}
+
+input UpdateCartItemInput {
+  cartItemId: String!
+  newQuantity: Int!
 }
 
 input UpdateProductInput {
@@ -189,11 +219,14 @@ input UpdateUserInput {
 scalar Upload
 
 type User {
+  cart: Cart
   createdAt: DateTime!
   email: String!
   id: ID!
   isAdmin: Boolean!
   name: String!
+  orders: [Order!]
+  password: String!
   updatedAt: DateTime!
   userDetails: UserDetails
 }
@@ -204,6 +237,7 @@ type UserDetails {
   country: String!
   createdAt: DateTime!
   id: ID!
+  orders: [Order!]
   phone: String!
   pincode: Int!
   updatedAt: DateTime!
