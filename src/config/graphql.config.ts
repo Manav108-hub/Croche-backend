@@ -18,4 +18,5 @@ export const graphqlConfig: ApolloDriverConfig = {
         }
         return error;
     },
+    csrfPrevention: false,
 };

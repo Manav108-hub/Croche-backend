@@ -1,28 +1,56 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { AddToCartInput } from './dto/cart.dto';
+import { Cart, CartItem, Product, Image, Prisma } from '@prisma/client';
+
+type ProductWithImages = Product & {
+  images?: Image[];
+};
+
+type CartItemWithProduct = CartItem & {
+  product: ProductWithImages;
+};
+
+type CartWithItems = Cart & {
+  items: CartItemWithProduct[];
+};
 
 @Injectable()
 export class CartService {
   constructor(private prisma: PrismaService) {}
 
-  private async calculateCartTotal(cart: any): Promise<number> {
-    return cart.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
+  private calculateCartTotal(cart: CartWithItems): number {
+    return cart.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   }
 
-  async getCartByUserId(userId: string) {
-    const cart = await this.prisma.cart.findFirst({ // Use findFirst instead of findUnique
-      where: { userId, isOrdered: false },  // Find active cart (not ordered)
-      include: { items: { include: { product: true } } },
+  async getCartByUserId(userId: string): Promise<CartWithItems | null> {
+    const cart = await this.prisma.cart.findFirst({
+      where: { 
+        userId,
+        isOrdered: false
+      },
+      include: {
+        items: {
+          include: {
+            product: {
+              include: {
+                images: true
+              }
+            }
+          }
+        }
+      }
     });
   
     if (!cart) return null;
-    const total = await this.calculateCartTotal(cart);
-    return { ...cart, total };
+    
+    return {
+      ...cart,
+      total: this.calculateCartTotal(cart)
+    } as CartWithItems;
   }
-  
 
-  async addToCart(input: AddToCartInput) {
+  async addToCart(input: AddToCartInput): Promise<CartWithItems> {
     try {
       // 1. Verify user exists
       const user = await this.prisma.user.findUnique({
@@ -43,18 +71,25 @@ export class CartService {
       }
   
       // 3. Find or create cart
-      let cart = await this.prisma.cart.findUnique({
-        where: { userId: input.userId },
+      let cart = await this.prisma.cart.findFirst({
+        where: { 
+          userId: input.userId,
+          isOrdered: false
+        },
         include: { 
           items: {
             include: {
-              product: true
+              product: {
+                include: {
+                  images: true
+                }
+              }
             }
           } 
         }
       });
   
-      if (!cart || cart.isOrdered) {
+      if (!cart) {
         cart = await this.prisma.cart.create({
           data: { 
             userId: input.userId, 
@@ -63,7 +98,11 @@ export class CartService {
           include: { 
             items: {
               include: {
-                product: true
+                product: {
+                  include: {
+                    images: true
+                  }
+                }
               }
             } 
           }
@@ -100,7 +139,7 @@ export class CartService {
             },
           });
         } else {
-          // 6b. Create new cart item with size handled similar to product creation
+          // 6b. Create new cart item
           await this.prisma.cartItem.create({
             data: {
               cart: {
@@ -140,28 +179,44 @@ export class CartService {
         throw new Error('Failed to fetch updated cart');
       }
   
-      return { 
-        ...updatedCart, 
-        total: await this.calculateCartTotal(updatedCart) 
-      };
-  
+      return {
+        ...updatedCart,
+        total: this.calculateCartTotal(updatedCart)
+      } as CartWithItems;
     } catch (error) {
       console.error('Cart update error:', error);
       throw new Error(`Failed to update cart: ${error.message}`);
     }
   }
 
-  async removeCartItem(cartItemId: string) {
+  async removeCartItem(cartItemId: string): Promise<CartWithItems> {
     const cartItem = await this.prisma.cartItem.delete({
       where: { id: cartItemId },
       include: { cart: true },
     });
 
     const updatedCart = await this.prisma.cart.findUnique({
-      where: { id: cartItem.cart.id },
-      include: { items: { include: { product: true }} },
+      where: { id: cartItem.cartId },
+      include: { 
+        items: { 
+          include: { 
+            product: {
+              include: {
+                images: true
+              }
+            } 
+          } 
+        } 
+      },
     });
 
-    return { ...updatedCart, total: await this.calculateCartTotal(updatedCart) };
+    if (!updatedCart) {
+      throw new Error('Failed to fetch updated cart');
+    }
+
+    return {
+      ...updatedCart,
+      total: this.calculateCartTotal(updatedCart)
+    } as CartWithItems;
   }
 }
