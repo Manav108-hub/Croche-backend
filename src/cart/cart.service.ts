@@ -44,7 +44,10 @@ export class CartService {
       // Get product with prices
       const product = await tx.product.findUnique({
         where: { id: input.productId },
-        include: { prices: true }
+        include: { 
+          prices: true,
+          images: true 
+        }
       });
       
       if (!product) {
@@ -55,8 +58,8 @@ export class CartService {
         throw new ForbiddenException('Insufficient stock');
       }
       
-      // Find price for selected size
-      const price = product.prices.find(p => p.size === input.size);
+      // Find price for selected size (using lowercase size)
+      const price = product.prices.find(p => p.size.toLowerCase() === input.size.toLowerCase());
       if (!price) {
         throw new NotFoundException('Selected size not available');
       }
@@ -64,11 +67,11 @@ export class CartService {
       // Check for existing cart item
       const existingItem = cart.items.find(item => 
         item.productId === input.productId && 
-        item.size === input.size
+        item.size.toLowerCase() === input.size.toLowerCase()
       );
 
       if (existingItem) {
-        // Update existing item with new price
+        // Update existing item quantity
         await tx.cartItem.update({
           where: { id: existingItem.id },
           data: { 

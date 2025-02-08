@@ -27,12 +27,10 @@ type CartItem {
   cartId: String!
   createdAt: DateTime!
   id: ID!
-  price: Float!
   product: Product!
   productId: String!
   quantity: Int!
   size: Size!
-  subtotal: Float!
   updatedAt: DateTime!
 }
 

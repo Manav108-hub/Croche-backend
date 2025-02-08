@@ -60,7 +60,9 @@ export class CartResolver {
 export class CartItemResolver {
   @ResolveField('price', () => Float)
   price(@Parent() cartItem: CartItem) {
-    const price = cartItem.product.prices.find(p => p.size === cartItem.size);
+    const price = cartItem.product.prices.find(
+      p => p.size.toLowerCase() === cartItem.size.toLowerCase()
+    );
     if (!price) {
       throw new Error(`Price not found for product ${cartItem.productId} size ${cartItem.size}`);
     }
@@ -69,7 +71,9 @@ export class CartItemResolver {
 
   @ResolveField('subtotal', () => Float)
   subtotal(@Parent() cartItem: CartItem) {
-    const price = cartItem.product.prices.find(p => p.size === cartItem.size);
+    const price = cartItem.product.prices.find(
+      p => p.size.toLowerCase() === cartItem.size.toLowerCase()
+    );
     if (!price) {
       throw new Error(`Price not found for product ${cartItem.productId} size ${cartItem.size}`);
     }

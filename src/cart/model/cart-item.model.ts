@@ -1,4 +1,4 @@
-import { ObjectType, Field, ID, Int, Float } from '@nestjs/graphql';
+import { ObjectType, Field, ID, Int } from '@nestjs/graphql';
 import { Product } from 'src/product/models/product.model';
 import { Size } from '@prisma/client';
 
@@ -21,12 +21,6 @@ export class CartItem {
 
   @Field(() => Size)
   size: Size;
-
-  @Field(() => Float)
-  price: number;  // Calculated from product prices
-
-  @Field(() => Float)
-  subtotal: number;  // Calculated as price * quantity
 
   @Field(() => Date)
   createdAt: Date;
