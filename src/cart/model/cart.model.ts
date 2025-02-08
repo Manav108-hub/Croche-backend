@@ -12,9 +12,6 @@ export class Cart {
   @Field(() => [CartItem])
   items: CartItem[];
 
-  @Field()
-  isOrdered: boolean;
-
   @Field(() => Float)
   total: number;
 

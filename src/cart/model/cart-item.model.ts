@@ -16,14 +16,17 @@ export class CartItem {
   @Field()
   productId: string;
 
-  @Field(() => Float)
-  price: number;  // Added price field
-
   @Field(() => Int)
   quantity: number;
 
   @Field(() => Size)
   size: Size;
+
+  @Field(() => Float)
+  price: number;  // Calculated from product prices
+
+  @Field(() => Float)
+  subtotal: number;  // Calculated as price * quantity
 
   @Field(() => Date)
   createdAt: Date;
