@@ -23,7 +23,7 @@ model User {
   updatedAt   DateTime     @updatedAt
   orders      Order[]
   userDetails UserDetails?
-  cart        Cart[]
+  cart        Cart?        // One user can have only one active cart
 }
 
 model UserDetails {
@@ -35,19 +35,17 @@ model UserDetails {
   pincode   Int
   country   String
   phone     String
-  orders    Order[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model Cart {
-  id        String     @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String     @db.ObjectId
-  user      User       @relation(fields: [userId], references: [id])
-  items     CartItem[] 
-  isOrdered Boolean    @default(false) // New column
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id        String      @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String      @unique @db.ObjectId  // One cart per user
+  user      User        @relation(fields: [userId], references: [id])
+  items     CartItem[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 }
 
 model CartItem {
@@ -56,58 +54,70 @@ model CartItem {
   cartId    String   @db.ObjectId
   product   Product  @relation(fields: [productId], references: [id])
   productId String   @db.ObjectId
-  price     Float // Snapshot of price at time of adding
   quantity  Int      @default(1)
   size      Size
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([cartId, productId, size])
+  @@unique([cartId, productId, size])  // Prevent duplicate items with same size
 }
 
 model Order {
   id            String      @id @default(auto()) @map("_id") @db.ObjectId
   userId        String      @db.ObjectId
   user          User        @relation(fields: [userId], references: [id])
-  userDetailsId String      @db.ObjectId
-  userDetails   UserDetails @relation(fields: [userDetailsId], references: [id])
-  totalPrice    Float // Changed from Decimal to Float for MongoDB
-  isPaid        Boolean     @default(false)
-  isOrdered     Boolean     @default(false)
-  isDelivered   Boolean     @default(false)
-  orderItems    OrderItem[]
+  items         OrderItem[]
+  totalAmount   Float
+  status        OrderStatus @default(pending)
+  address       String      // Storing address directly for order history
+  city          String
+  pincode       Int
+  country       String
+  phone         String
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+}
+
+enum OrderStatus {
+  pending
+  paid
+  processing
+  shipped
+  delivered
+  cancelled
 }
 
 model OrderItem {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   orderId   String   @db.ObjectId
   order     Order    @relation(fields: [orderId], references: [id])
-  itemName  String
+  product   Product  @relation(fields: [productId], references: [id])
+  productId String   @db.ObjectId
   quantity  Int
-  price     Float // Changed from Decimal to Float for MongoDB
+  size      Size
+  price     Float    // Price at time of order
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model Product {
-  id          String     @id @default(auto()) @map("_id") @db.ObjectId
+  id          String      @id @default(auto()) @map("_id") @db.ObjectId
   name        String
   category    String
-  stock       Int        @default(0)
+  stock       Int         @default(0)
   description String?
   prices      Price[]
   images      Image[]
-  cartItems   CartItem[] // Add this relation field
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  cartItems   CartItem[]  // Products in carts
+  orderItems  OrderItem[] // Products in orders
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 }
 
 model Image {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  public_id String // Cloudinary public ID
-  url       String // Cloudinary secure URL
+  public_id String   // Cloudinary public ID
+  url       String   // Cloudinary secure URL
   product   Product? @relation(fields: [productId], references: [id])
   productId String?  @db.ObjectId
   width     Int
@@ -124,4 +134,6 @@ model Price {
   product   Product  @relation(fields: [productId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@unique([productId, size])  // One price per size per product
 }
