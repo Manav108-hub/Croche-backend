@@ -1,8 +1,10 @@
 import { ObjectType, Field, ID, Float, registerEnumType } from '@nestjs/graphql';
-import { OrderStatus } from '@prisma/client';
+import { OrderStatus} from '@prisma/client';
 import { IsString, IsNumber, IsEnum, IsArray, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { OrderItem } from './order-item.model';
+import { UserDetails } from 'src/user/models/user-details.model';
+import { User } from 'src/user/models/user.model';
 
 registerEnumType(OrderStatus, {
   name: 'OrderStatus',
@@ -15,13 +17,11 @@ export class Order {
   @IsString()
   id: string;
 
-  @Field()
-  @IsString()
-  userId: string;
+  @Field(() => User)  // Not String!
+  user: User;
 
-  @Field()
-  @IsString()
-  userDetailsId: string;
+  @Field(() => UserDetails)
+  userDetails: UserDetails;
 
   @Field(() => [OrderItem])
   @IsArray()

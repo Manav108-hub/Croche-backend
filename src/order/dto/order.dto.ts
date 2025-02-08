@@ -1,46 +1,47 @@
+import { InputType, Field, ID } from '@nestjs/graphql';
 import { IsString, IsNumber, IsEnum, IsArray, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import {  OrderStatus , Size } from '@prisma/client';
+import { Size, OrderStatus } from '@prisma/client';
 
-
-class OrderItemDto {
-  @IsString()
-  id: string;
-
+@InputType()
+class OrderItemInput {
+  @Field(() => ID)
   @IsString()
   productId: string;
 
-  @IsString()
-  orderId: string;
-
+  @Field(() => Number)
   @IsNumber()
   quantity: number;
 
+  @Field(() => Size)
   @IsEnum(Size)
   size: Size;
-
-  @IsNumber()
-  price: number;
 }
 
-export class OrderDto {
-  @IsString()
-  id: string;
-
+@InputType()
+export class CreateOrderInput {
+  @Field(() => ID)
   @IsString()
   userId: string;
 
+  @Field(() => ID)
   @IsString()
   userDetailsId: string;
 
+  @Field(() => [OrderItemInput])
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => OrderItemDto)
-  items: OrderItemDto[];
+  @Type(() => OrderItemInput)
+  items: OrderItemInput[];
+}
 
-  @IsNumber()
-  totalAmount: number;
+@InputType()
+export class UpdateOrderStatusInput {
+  @Field(() => ID)
+  @IsString()
+  orderId: string;
 
+  @Field(() => OrderStatus)
   @IsEnum(OrderStatus)
   status: OrderStatus;
 }
