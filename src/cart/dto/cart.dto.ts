@@ -7,6 +7,11 @@ export class AddToCartInput {
   @Field(() => String)
   @IsString()
   @IsNotEmpty()
+  userId: string;
+
+  @Field(() => String)
+  @IsString()
+  @IsNotEmpty()
   productId: string;
 
   @Field(() => Int)
@@ -29,5 +34,5 @@ export class UpdateCartItemInput {
   @Field(() => Int)
   @IsInt()
   @Min(1)
-  newQuantity: number;
+  quantity: number;
 }

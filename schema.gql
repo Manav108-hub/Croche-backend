@@ -6,6 +6,7 @@ input AddToCartInput {
   productId: String!
   quantity: Int!
   size: Size!
+  userId: String!
 }
 
 type AuthResponse {
@@ -77,9 +78,9 @@ type Mutation {
   deleteUser(id: String!): Boolean!
   login(input: LoginInput!): AuthResponse!
   register(input: RegisterUserInput!): AuthResponse!
-  removeCartItem(cartItemId: String!): Cart!
+  removeCartItem(cartItemId: String!, userId: String!): Cart!
   toggleUserAdmin(id: String!, isAdmin: Boolean!): User!
-  updateCartItem(input: UpdateCartItemInput!): Cart!
+  updateCartItem(input: UpdateCartItemInput!, userId: String!): Cart!
   updateProduct(input: UpdateProductInput!): Product!
   updateUser(input: UpdateUserInput!): User!
   updateUserAdmin(id: String!, input: UpdateUserInput!): User!
@@ -157,7 +158,7 @@ type ProductImage {
 }
 
 type Query {
-  getCart: Cart
+  getCart(userId: String!): Cart
   me: User!
   order(id: String!): Order
   orders: [Order!]!
@@ -182,13 +183,9 @@ enum Size {
   small
 }
 
-type Subscription {
-  cartUpdated: Cart!
-}
-
 input UpdateCartItemInput {
   cartItemId: String!
-  newQuantity: Int!
+  quantity: Int!
 }
 
 input UpdateProductInput {

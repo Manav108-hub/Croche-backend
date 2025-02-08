@@ -1,68 +1,39 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { AddToCartInput, UpdateCartItemInput } from './dto/cart.dto';
-import { Cart, CartItem, Product, Size, Price, Image } from '@prisma/client';
-
-type ProductWithDetails = Product & {
-  prices: Price[];
-  images: Image[];
-};
-
-type CartItemWithDetails = CartItem & {
-  product: ProductWithDetails;
-};
-
-type CartWithItems = Cart & {
-  items: CartItemWithDetails[];
-};
+import { Cart, CartItem, Product, Size } from '@prisma/client';
 
 @Injectable()
 export class CartService {
   constructor(private prisma: PrismaService) {}
 
-  private getItemPrice(item: CartItemWithDetails): number {
-    const price = item.product.prices.find(p => p.size === item.size);
+  private async getProductPrice(productId: string, size: Size): Promise<number> {
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+      include: { prices: true }
+    });
+
+    const price = product?.prices.find(p => p.size === size);
     if (!price) {
-      throw new Error(`Price not found for product ${item.productId} size ${item.size}`);
+      throw new NotFoundException(`Price not found for product ${productId} size ${size}`);
     }
+
     return price.value;
   }
 
-  private calculateCartTotal(items: CartItemWithDetails[]): number {
-    return items.reduce((sum, item) => {
-      const price = this.getItemPrice(item);
-      return sum + (price * item.quantity);
-    }, 0);
-  }
+  async addToCart(userId: string, input: AddToCartInput) {
+    if (!userId) {
+      throw new ForbiddenException('User ID is required');
+    }
 
-  async getCartByUserId(userId: string): Promise<CartWithItems | null> {
-    const cart = await this.prisma.cart.findUnique({
-      where: { userId },
-      include: {
-        items: {
-          include: {
-            product: {
-              include: {
-                prices: true,
-                images: true
-              }
-            }
-          }
-        }
-      }
-    });
-
-    return cart;
-  }
-
-  async addToCart(userId: string, input: AddToCartInput): Promise<CartWithItems> {
     return this.prisma.$transaction(async (tx) => {
-      // Find or create cart
+      // First, check if cart exists
       let cart = await tx.cart.findUnique({
         where: { userId },
         include: { items: true }
       });
 
+      // If no cart exists, create one
       if (!cart) {
         cart = await tx.cart.create({
           data: { userId },
@@ -97,7 +68,7 @@ export class CartService {
       );
 
       if (existingItem) {
-        // Update existing item quantity
+        // Update existing item with new price
         await tx.cartItem.update({
           where: { id: existingItem.id },
           data: { 
@@ -116,8 +87,8 @@ export class CartService {
         });
       }
 
-      // Get updated cart with all items and details
-      const updatedCart = await tx.cart.findUniqueOrThrow({
+      // Return updated cart with all details
+      return tx.cart.findUniqueOrThrow({
         where: { id: cart.id },
         include: {
           items: {
@@ -129,24 +100,21 @@ export class CartService {
                 }
               }
             }
-          }
+          },
+          user: true
         }
       });
-
-      return updatedCart;
     });
   }
 
-  async updateCartItem(userId: string, input: UpdateCartItemInput): Promise<CartWithItems> {
+  async updateCartItem(userId: string, input: UpdateCartItemInput) {
     return this.prisma.$transaction(async (tx) => {
       const cartItem = await tx.cartItem.findUnique({
         where: { id: input.cartItemId },
         include: { 
           cart: true,
           product: {
-            include: {
-              prices: true
-            }
+            include: { prices: true }
           }
         }
       });
@@ -155,20 +123,20 @@ export class CartService {
         throw new ForbiddenException('Cart item not found');
       }
 
-      if (input.newQuantity < 1) {
+      if (input.quantity < 1) {
         throw new ForbiddenException('Quantity must be at least 1');
       }
 
-      if (cartItem.product.stock < input.newQuantity) {
+      if (cartItem.product.stock < input.quantity) {
         throw new ForbiddenException('Insufficient stock');
       }
       
       await tx.cartItem.update({
         where: { id: input.cartItemId },
-        data: { quantity: input.newQuantity }
+        data: { quantity: input.quantity }
       });
 
-      const updatedCart = await tx.cart.findUniqueOrThrow({
+      return tx.cart.findUniqueOrThrow({
         where: { id: cartItem.cart.id },
         include: {
           items: {
@@ -180,15 +148,14 @@ export class CartService {
                 }
               }
             }
-          }
+          },
+          user: true
         }
       });
-
-      return updatedCart;
     });
   }
 
-  async removeCartItem(userId: string, cartItemId: string): Promise<CartWithItems> {
+  async removeCartItem(userId: string, cartItemId: string) {
     return this.prisma.$transaction(async (tx) => {
       const cartItem = await tx.cartItem.findUnique({
         where: { id: cartItemId },
@@ -201,7 +168,7 @@ export class CartService {
 
       await tx.cartItem.delete({ where: { id: cartItemId } });
 
-      const updatedCart = await tx.cart.findUniqueOrThrow({
+      return tx.cart.findUniqueOrThrow({
         where: { id: cartItem.cart.id },
         include: {
           items: {
@@ -213,11 +180,29 @@ export class CartService {
                 }
               }
             }
-          }
+          },
+          user: true
         }
       });
+    });
+  }
 
-      return updatedCart;
+  async getCartByUserId(userId: string) {
+    return this.prisma.cart.findUnique({
+      where: { userId },
+      include: {
+        items: {
+          include: {
+            product: {
+              include: {
+                prices: true,
+                images: true
+              }
+            }
+          }
+        },
+        user: true
+      }
     });
   }
 }
