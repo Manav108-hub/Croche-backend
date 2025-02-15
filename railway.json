@@ -1,0 +1,12 @@
+{
+    "build": {
+      "install": "pnpm install",
+      "build": "pnpm prisma generate && pnpm prisma db push && pnpm run build"
+    },
+    "start": "pnpm run start:prod",
+    "env": {
+      "NODE_ENV": "production",
+      "PORT": "3000"
+    }
+  }
+  
