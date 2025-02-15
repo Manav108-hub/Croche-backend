@@ -24,10 +24,6 @@ export class CreateOrderInput {
   @IsString()
   userId: string;
 
-  @Field(() => Boolean)
-  @IsBoolean()
-  emailSent: Boolean;
-
   @Field(() => ID)
   @IsString()
   userDetailsId: string;

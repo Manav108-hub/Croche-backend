@@ -35,7 +35,6 @@ type CartItem {
 }
 
 input CreateOrderInput {
-  emailSent: Boolean!
   items: [OrderItemInput!]!
   userDetailsId: ID!
   userId: ID!
