@@ -39,6 +39,12 @@ export class UserResolver {
     }
 
     @Query(() => User)
+@UseGuards(GqlAuthGuard)
+async userById(@Args('id') id: string) {
+    return this.userService.findOne(id);
+}
+
+    @Query(() => User)
     @UseGuards(GqlAuthGuard)
     async userByEmail(@Args('email') email: string) {
         const user = await this.userService.findByEmail(email);

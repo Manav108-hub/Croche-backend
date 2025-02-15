@@ -8,6 +8,7 @@ import * as bcrypt from 'bcryptjs';
 export class UserService {
     constructor(private prisma: PrismaService) {}
 
+    // Single findOne implementation
     async findOne(id: string) {
         const user = await this.prisma.user.findUnique({
             where: { id },
@@ -15,7 +16,7 @@ export class UserService {
                 userDetails: true,
                 orders: {
                     include: {
-                        items: true  // Corrected to 'items'
+                        items: true
                     }
                 }
             }
@@ -37,7 +38,7 @@ export class UserService {
                     include: {
                         items: {
                             include: {
-                                product: true, // Include product details in the cart items
+                                product: true,
                             },
                         },
                     },
@@ -51,29 +52,26 @@ export class UserService {
     
         return user;
     }
-    
 
-    
-    // Inside UserService class
-async findUserWithOrders(id: string) {
-    const user = await this.prisma.user.findUnique({
-        where: { id },
-        include: {
-            userDetails: true,
-            orders: {
-                include: {
-                    items: true
+    async findUserWithOrders(id: string) {
+        const user = await this.prisma.user.findUnique({
+            where: { id },
+            include: {
+                userDetails: true,
+                orders: {
+                    include: {
+                        items: true
+                    }
                 }
             }
+        });
+
+        if (!user) {
+            throw new NotFoundException('User not found');
         }
-    });
 
-    if (!user) {
-        throw new NotFoundException('User not found');
+        return user;
     }
-
-    return user;
-}
 
     async findByEmail(email: string) {
         const user = await this.prisma.user.findUnique({
@@ -89,7 +87,6 @@ async findUserWithOrders(id: string) {
     }
 
     async update(id: string, input: UpdateUserInput) {
-        // Check if user exists
         const user = await this.prisma.user.findUnique({
             where: { id }
         });
@@ -98,7 +95,6 @@ async findUserWithOrders(id: string) {
             throw new NotFoundException('User not found');
         }
 
-        // If updating email, check if new email already exists
         if (input.email) {
             const emailExists = await this.prisma.user.findUnique({
                 where: { email: input.email }
@@ -108,7 +104,6 @@ async findUserWithOrders(id: string) {
             }
         }
 
-        // If updating password, hash it
         let data = { ...input };
         if (input.password) {
             data.password = await bcrypt.hash(input.password, 10);
@@ -121,16 +116,14 @@ async findUserWithOrders(id: string) {
                 userDetails: true,
                 orders: {
                     include: {
-                        items: true  // Corrected to 'items'
+                        items: true
                     }
                 }
             }
         });
-        
     }
 
     async updateUserDetails(userId: string, input: UpdateUserDetailsInput) {
-        // Check if user exists
         const user = await this.prisma.user.findUnique({
             where: { id: userId },
             include: { userDetails: true }
@@ -141,7 +134,6 @@ async findUserWithOrders(id: string) {
         }
 
         if (user.userDetails) {
-            // Update existing user details
             return this.prisma.userDetails.update({
                 where: { userId },
                 data: {
@@ -153,7 +145,6 @@ async findUserWithOrders(id: string) {
                 }
             });
         } else {
-            // Create new user details
             return this.prisma.userDetails.create({
                 data: {
                     userId,
@@ -168,7 +159,6 @@ async findUserWithOrders(id: string) {
     }
 
     async delete(id: string) {
-        // Check if user exists
         const user = await this.prisma.user.findUnique({
             where: { id }
         });
@@ -177,13 +167,10 @@ async findUserWithOrders(id: string) {
             throw new NotFoundException('User not found');
         }
 
-        // Delete user and all related data
         await this.prisma.$transaction([
-            // Delete user details
             this.prisma.userDetails.deleteMany({
                 where: { userId: id }
             }),
-            // Delete order items
             this.prisma.orderItem.deleteMany({
                 where: {
                     order: {
@@ -191,11 +178,9 @@ async findUserWithOrders(id: string) {
                     }
                 }
             }),
-            // Delete orders
             this.prisma.order.deleteMany({
                 where: { userId: id }
             }),
-            // Finally delete the user
             this.prisma.user.delete({
                 where: { id }
             })

@@ -178,6 +178,7 @@ type Query {
   product(id: String!): Product!
   products: [Product!]!
   userByEmail(email: String!): User!
+  userById(id: String!): User!
   userWithCart: User!
   userWithOrders: User!
 }

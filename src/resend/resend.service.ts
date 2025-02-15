@@ -98,6 +98,51 @@ export class ResendService {
     }
   }
 
+  /**
+   * Sends a confirmation email to the admin including extra details such as
+   * the customer's name and address.
+   */
+  async sendOrderConfirmationAdminEmail(
+    to: string,
+    orderDetails: {
+      orderId: string;
+      customerName: string;
+      customerAddress: string;
+      products: Array<{
+        name: string;
+        quantity: number;
+        price: number;
+        size: string;
+      }>;
+      totalAmount: number;
+    }
+  ) {
+    try {
+      this.logger.log(`Sending admin order confirmation email for order ${orderDetails.orderId} to ${to}`);
+      
+      const { data, error } = await this.resend.emails.send({
+        from: this.fromEmail,
+        to,
+        subject: `New Order Received #${orderDetails.orderId} from ${orderDetails.customerName}`,
+        html: this.generateAdminOrderEmailHtml(orderDetails),
+      });
+
+      if (error) {
+        this.logger.error(`Failed to send admin confirmation email: ${error.message}`);
+        throw error;
+      }
+
+      this.logger.log(`Successfully sent admin order confirmation email for order ${orderDetails.orderId}`);
+      return data;
+    } catch (error) {
+      this.logger.error(
+        `Error sending admin confirmation email for order ${orderDetails.orderId}: ${error.message}`,
+        error.stack
+      );
+      throw error;
+    }
+  }
+
   private generateOrderEmailHtml(orderDetails: {
     orderId: string;
     products: Array<{
@@ -147,6 +192,62 @@ export class ResendService {
     `;
   }
 
+  /**
+   * Generates an HTML email for the admin that includes extra details about the customer.
+   */
+  private generateAdminOrderEmailHtml(orderDetails: {
+    orderId: string;
+    customerName: string;
+    customerAddress: string;
+    products: Array<{
+      name: string;
+      quantity: number;
+      price: number;
+      size: string;
+    }>;
+    totalAmount: number;
+  }): string {
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto;">
+        <h1 style="color: #1a365d;">New Order Received</h1>
+        <p style="font-size: 16px;">Order ID: #${orderDetails.orderId}</p>
+        
+        <div style="background-color: #f1f5f9; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+          <h2 style="color: #1a365d; margin-top: 0;">Customer Details</h2>
+          <p style="margin: 4px 0;"><strong>Name:</strong> ${orderDetails.customerName}</p>
+          <p style="margin: 4px 0;"><strong>Address:</strong> ${orderDetails.customerAddress}</p>
+        </div>
+        
+        <h2 style="color: #1a365d; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px;">
+          Order Summary
+        </h2>
+        
+        <ul style="list-style: none; padding: 0;">
+          ${orderDetails.products.map(product => `
+            <li style="padding: 12px 0; border-bottom: 1px solid #e2e8f0;">
+              <div style="display: flex; justify-content: space-between;">
+                <div>
+                  <strong>${product.name}</strong><br>
+                  <span style="color: #718096;">Size: ${product.size}</span>
+                </div>
+                <div style="text-align: right;">
+                  ${product.quantity} x $${product.price.toFixed(2)}<br>
+                  <span style="color: #718096;">$${(product.quantity * product.price).toFixed(2)}</span>
+                </div>
+              </div>
+            </li>
+          `).join('')}
+        </ul>
+        
+        <div style="margin-top: 24px; text-align: right;">
+          <h3 style="color: #1a365d;">
+            Total Amount: $${orderDetails.totalAmount.toFixed(2)}
+          </h3>
+        </div>
+      </div>
+    `;
+  }
+
   private generateStatusEmailHtml(data: {
     orderId: string;
     newStatus: string;
@@ -160,7 +261,7 @@ export class ResendService {
       cancelled: 'Your order has been cancelled.',
     };
 
-    const statusMessage = statusMessages[data.newStatus.toLowerCase()] || 
+    const statusMessage = statusMessages[data.newStatus.toLowerCase()] ||
       `Your order status has been updated to: ${data.newStatus}`;
 
     return `
