@@ -20,6 +20,9 @@ import { CartService } from './cart/cart.service';
 import { CartResolver } from './cart/cart.resolver';
 import { PubSubService } from './pubsub/pubsub.service';
 import { OrderModule } from './order/order.module';
+import { ResendController } from './resend/resend.controller';
+import { ResendService } from './resend/resend.service';
+import { ResendModule } from './resend/resend.module';
 
 @Module({
   imports: [
@@ -27,6 +30,8 @@ import { OrderModule } from './order/order.module';
       isGlobal: true,
       cache: true,
     }),
+    ResendModule,
+    OrderModule,
     ThrottlerModule.forRoot([{ //spammer se bachna 
       ttl: 60,
       limit: 10,
@@ -38,9 +43,9 @@ import { OrderModule } from './order/order.module';
     PrismaModule, 
     AuthModule, 
     UserModule, 
-    ProductModule, ImageModule, OrderModule
+    ProductModule, ImageModule, OrderModule, ResendModule
   ],
-  controllers: [AppController],
+  controllers: [AppController, ResendController],
   providers: [
     AppService,
     {
@@ -58,6 +63,7 @@ import { OrderModule } from './order/order.module';
     CartService,
     CartResolver,
     PubSubService,
+    ResendService,
   ],
 })
 export class AppModule implements NestModule {

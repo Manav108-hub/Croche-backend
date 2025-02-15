@@ -1,10 +1,22 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { 
+  ConflictException, 
+  Injectable, 
+  NotFoundException,
+  Logger 
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ResendService } from '../resend/resend.service';
 import { Order, OrderStatus, Prisma, Size } from '@prisma/client';
+
 
 @Injectable()
 export class OrderService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(OrderService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private resendService: ResendService
+  ) {}
 
   async createOrder(input: {
     userId: string;
@@ -16,16 +28,20 @@ export class OrderService {
     }>;
   }): Promise<Order> {
     return this.prisma.$transaction(async (prisma) => {
-      // 1. Validate user and user details
       const [user, userDetails] = await Promise.all([
-        prisma.user.findUnique({ where: { id: input.userId } }),
-        prisma.userDetails.findUnique({ where: { id: input.userDetailsId } }),
+        prisma.user.findUnique({ 
+          where: { id: input.userId },
+          select: { id: true, email: true }
+        }),
+        prisma.userDetails.findUnique({ 
+          where: { id: input.userDetailsId },
+          select: { id: true }
+        }),
       ]);
 
       if (!user) throw new NotFoundException('User not found');
       if (!userDetails) throw new NotFoundException('User details not found');
 
-      // 2. Process items and validate stock/price
       const itemsWithPrices = await Promise.all(
         input.items.map(async (item) => {
           const product = await prisma.product.findUnique({
@@ -33,41 +49,26 @@ export class OrderService {
             include: { prices: true },
           });
 
-          if (!product) {
-            throw new NotFoundException(`Product ${item.productId} not found`);
-          }
-
-          const price = product.prices.find(
-            (p) => p.size === item.size,
-          );
-
-          if (!price) {
-            throw new ConflictException(
-              `Price not found for product ${item.productId} with size ${item.size}`,
-            );
-          }
-
-          if (product.stock < item.quantity) {
-            throw new ConflictException(
-              `Insufficient stock for product ${product.name}. Available: ${product.stock}, Requested: ${item.quantity}`,
-            );
-          }
+          if (!product) throw new NotFoundException(`Product ${item.productId} not found`);
+          const price = product.prices.find(p => p.size === item.size);
+          if (!price) throw new ConflictException(`Price not found for ${product.name} (${item.size})`);
+          if (product.stock < item.quantity) throw new ConflictException(`Insufficient stock for ${product.name}`);
 
           return {
             ...item,
+            productName: product.name,
             price: price.value,
             currentStock: product.stock,
           };
         }),
       );
 
-      // 3. Calculate total amount
-      const totalAmount = itemsWithPrices.reduce(
-        (sum, item) => sum + item.price * item.quantity,
-        0,
+      const totalAmount = parseFloat(
+        itemsWithPrices
+          .reduce((sum, item) => sum + (item.price * item.quantity), 0)
+          .toFixed(2)
       );
 
-      // 4. Create the order
       const order = await prisma.order.create({
         data: {
           userId: input.userId,
@@ -76,7 +77,7 @@ export class OrderService {
           status: OrderStatus.pending,
           items: {
             createMany: {
-              data: itemsWithPrices.map((item) => ({
+              data: itemsWithPrices.map(item => ({
                 productId: item.productId,
                 quantity: item.quantity,
                 size: item.size,
@@ -85,109 +86,144 @@ export class OrderService {
             },
           },
         },
-        include: { items: true, userDetails: true },
+        include: { 
+          items: true, 
+          userDetails: true,
+          user: { select: { email: true, id: true } } 
+        },
       });
 
-      // 5. Update product stock
       await Promise.all(
-        itemsWithPrices.map((item) =>
+        itemsWithPrices.map(item =>
           prisma.product.update({
             where: { id: item.productId },
             data: { stock: item.currentStock - item.quantity },
-          }),
-        ),
+          })
+        )
       );
+
+      try {
+        await this.resendService.sendOrderConfirmationEmail(
+          user.email,
+          {
+            orderId: order.id,
+            products: itemsWithPrices.map(item => ({
+              name: item.productName,
+              quantity: item.quantity,
+              price: item.price,
+              size: item.size,
+            })),
+            totalAmount: order.totalAmount,
+          }
+        );
+        await prisma.order.update({
+          where: { id: order.id },
+          data: { emailSent: true },
+        });
+      } catch (emailError) {
+        this.logger.error(`Email failed for order ${order.id}: ${emailError.message}`);
+      }
 
       return order;
     });
   }
 
-  async updateOrderStatus(
-    id: string,
-    newStatus: OrderStatus,
-  ): Promise<Order> {
+  async updateOrderStatus(id: string, newStatus: OrderStatus): Promise<Order> {
     return this.prisma.$transaction(async (prisma) => {
       const order = await prisma.order.findUnique({
         where: { id },
-        include: { items: { include: { product: true } } },
+        include: { 
+          items: { 
+            include: { 
+              product: { select: { stock: true, name: true } } 
+            } 
+          },
+          user: { select: { email: true } }
+        },
       });
 
       if (!order) throw new NotFoundException('Order not found');
 
-      // Handle stock adjustments for cancellations
       if (newStatus === OrderStatus.cancelled && order.status !== OrderStatus.cancelled) {
-        // Restore stock
         await Promise.all(
-          order.items.map((item) =>
+          order.items.map(item =>
             prisma.product.update({
               where: { id: item.productId },
               data: { stock: item.product.stock + item.quantity },
-            }),
-          ),
+            })
+          )
         );
       } else if (order.status === OrderStatus.cancelled && newStatus !== OrderStatus.cancelled) {
-        // Re-reserve stock if uncancelling
         await Promise.all(
-          order.items.map(async (item) => {
+          order.items.map(async item => {
             if (item.product.stock < item.quantity) {
-              throw new ConflictException(
-                `Insufficient stock to uncancel order for product ${item.product.name}`,
-              );
+              throw new ConflictException(`Insufficient stock for ${item.product.name}`);
             }
             return prisma.product.update({
               where: { id: item.productId },
               data: { stock: item.product.stock - item.quantity },
             });
-          }),
+          })
         );
       }
 
-      return prisma.order.update({
+      const updatedOrder = await prisma.order.update({
         where: { id },
-        data: {
-          status: newStatus,
-          updatedAt: new Date(),
+        data: { status: newStatus, updatedAt: new Date() },
+        include: { 
+          items: { include: { product: true } }, 
+          userDetails: true,
+          user: { select: { email: true } } 
         },
-        include: { items: true, userDetails: true },
       });
+
+      if (order.user?.email && (newStatus === OrderStatus.shipped || newStatus === OrderStatus.delivered)) {
+        try {
+          await this.resendService.sendOrderStatusUpdateEmail(
+            order.user.email,
+            {
+              orderId: updatedOrder.id,
+              newStatus,
+              trackingNumber: 'TRACKING_NUMBER',
+              estimatedDelivery: new Date(Date.now() + 3 * 86400000).toDateString(),
+            }
+          );
+        } catch (emailError) {
+          this.logger.error(`Status email failed for order ${id}: ${emailError.message}`);
+        }
+      }
+
+      return updatedOrder;
     });
   }
 
-  // In getOrders() and getOrderById() methods
-async getOrders(): Promise<Order[]> {
-  return this.prisma.order.findMany({
-    include: {
-      items: {
-        include: {
-          product: {
-            include: {
-              prices: true // Add this
-            }
+  async getOrders(): Promise<Order[]> {
+    return this.prisma.order.findMany({
+      include: {
+        items: {
+          include: {
+            product: { include: { prices: true } }
           }
-        }
+        },
+        userDetails: true,
+        user: { select: { email: true, name: true } }
       },
-      userDetails: true,
-      user: true // Add this for user relation
-    }
-  });
-}
+      orderBy: { createdAt: 'desc' }
+    });
+  }
 
-async getOrderById(id: string): Promise<Order | null> {
-  return this.prisma.order.findUnique({
-    where: { id },
-    include: {
-      items: {
-        include: {
-          product: {
-            include: {
-              prices: true // Add this
-            }
+  async getOrderById(id: string): Promise<Order | null> {
+    return this.prisma.order.findUnique({
+      where: { id },
+      include: {
+        items: {
+          include: {
+            product: { include: { prices: true } }
           }
-        }
-      },
-      userDetails: true,
-      user: true // Add this for user relation
-    }
-  });
-}
+        },
+        userDetails: true,
+        user: { select: { email: true, name: true } }
+      }
+    });
+  }
 }

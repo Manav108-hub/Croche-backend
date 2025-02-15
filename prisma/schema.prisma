@@ -72,6 +72,7 @@ model Order {
   items         OrderItem[]
   totalAmount   Float
   status        OrderStatus @default(pending)
+  emailSent     Boolean     @default(false)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 }
@@ -134,4 +135,14 @@ model Price {
   updatedAt DateTime @updatedAt
 
   @@unique([productId, size])  // One price per size per product
+}
+
+model EmailLog {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  orderId     String   @db.ObjectId
+  type        String   // confirmation, shipping, etc
+  status      String   // sent, failed
+  error       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

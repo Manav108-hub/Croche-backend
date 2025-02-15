@@ -35,6 +35,7 @@ type CartItem {
 }
 
 input CreateOrderInput {
+  emailSent: Boolean!
   items: [OrderItemInput!]!
   userDetailsId: ID!
   userId: ID!
@@ -96,6 +97,7 @@ type Mutation {
 
 type Order {
   createdAt: DateTime!
+  emailSent: Boolean!
   id: ID!
   items: [OrderItem!]!
   status: OrderStatus!

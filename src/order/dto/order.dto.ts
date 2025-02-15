@@ -1,5 +1,5 @@
 import { InputType, Field, ID } from '@nestjs/graphql';
-import { IsString, IsNumber, IsEnum, IsArray, ValidateNested } from 'class-validator';
+import { IsString, IsNumber, IsEnum, IsArray, ValidateNested, isBoolean, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
 import { Size, OrderStatus } from '@prisma/client';
 
@@ -23,6 +23,10 @@ export class CreateOrderInput {
   @Field(() => ID)
   @IsString()
   userId: string;
+
+  @Field(() => Boolean)
+  @IsBoolean()
+  emailSent: Boolean;
 
   @Field(() => ID)
   @IsString()
