@@ -6,8 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ResendService } from '../resend/resend.service';
-import { Order, OrderStatus, Prisma, Size } from '@prisma/client';
-
+import { Order, OrderStatus, Size } from '@prisma/client';
 
 @Injectable()
 export class OrderService {
@@ -28,6 +27,7 @@ export class OrderService {
     }>;
   }): Promise<Order> {
     return this.prisma.$transaction(async (prisma) => {
+      // 1. Validate user and user details exist
       const [user, userDetails] = await Promise.all([
         prisma.user.findUnique({ 
           where: { id: input.userId },
@@ -42,6 +42,7 @@ export class OrderService {
       if (!user) throw new NotFoundException('User not found');
       if (!userDetails) throw new NotFoundException('User details not found');
 
+      // 2. Get products with prices and validate stock
       const itemsWithPrices = await Promise.all(
         input.items.map(async (item) => {
           const product = await prisma.product.findUnique({
@@ -49,10 +50,18 @@ export class OrderService {
             include: { prices: true },
           });
 
-          if (!product) throw new NotFoundException(`Product ${item.productId} not found`);
+          if (!product) {
+            throw new NotFoundException(`Product ${item.productId} not found`);
+          }
+
           const price = product.prices.find(p => p.size === item.size);
-          if (!price) throw new ConflictException(`Price not found for ${product.name} (${item.size})`);
-          if (product.stock < item.quantity) throw new ConflictException(`Insufficient stock for ${product.name}`);
+          if (!price) {
+            throw new ConflictException(`Price not found for ${product.name} (${item.size})`);
+          }
+
+          if (product.stock < item.quantity) {
+            throw new ConflictException(`Insufficient stock for ${product.name}`);
+          }
 
           return {
             ...item,
@@ -63,12 +72,14 @@ export class OrderService {
         }),
       );
 
+      // 3. Calculate total amount
       const totalAmount = parseFloat(
         itemsWithPrices
           .reduce((sum, item) => sum + (item.price * item.quantity), 0)
           .toFixed(2)
       );
 
+      // 4. Create order
       const order = await prisma.order.create({
         data: {
           userId: input.userId,
@@ -93,6 +104,7 @@ export class OrderService {
         },
       });
 
+      // 5. Update product stock
       await Promise.all(
         itemsWithPrices.map(item =>
           prisma.product.update({
@@ -102,6 +114,7 @@ export class OrderService {
         )
       );
 
+      // 6. Send confirmation email
       try {
         await this.resendService.sendOrderConfirmationEmail(
           user.email,
@@ -116,6 +129,8 @@ export class OrderService {
             totalAmount: order.totalAmount,
           }
         );
+
+        // Update emailSent flag if email was sent successfully
         await prisma.order.update({
           where: { id: order.id },
           data: { emailSent: true },
@@ -130,6 +145,7 @@ export class OrderService {
 
   async updateOrderStatus(id: string, newStatus: OrderStatus): Promise<Order> {
     return this.prisma.$transaction(async (prisma) => {
+      // 1. Get order with related data
       const order = await prisma.order.findUnique({
         where: { id },
         include: { 
@@ -144,7 +160,9 @@ export class OrderService {
 
       if (!order) throw new NotFoundException('Order not found');
 
+      // 2. Handle stock updates for cancellations
       if (newStatus === OrderStatus.cancelled && order.status !== OrderStatus.cancelled) {
+        // Return items to stock when cancelling
         await Promise.all(
           order.items.map(item =>
             prisma.product.update({
@@ -154,6 +172,7 @@ export class OrderService {
           )
         );
       } else if (order.status === OrderStatus.cancelled && newStatus !== OrderStatus.cancelled) {
+        // Remove items from stock when un-cancelling
         await Promise.all(
           order.items.map(async item => {
             if (item.product.stock < item.quantity) {
@@ -167,9 +186,10 @@ export class OrderService {
         );
       }
 
+      // 3. Update order status
       const updatedOrder = await prisma.order.update({
         where: { id },
-        data: { status: newStatus, updatedAt: new Date() },
+        data: { status: newStatus },
         include: { 
           items: { include: { product: true } }, 
           userDetails: true,
@@ -177,6 +197,7 @@ export class OrderService {
         },
       });
 
+      // 4. Send status update email for shipping/delivery
       if (order.user?.email && (newStatus === OrderStatus.shipped || newStatus === OrderStatus.delivered)) {
         try {
           await this.resendService.sendOrderStatusUpdateEmail(
@@ -184,7 +205,7 @@ export class OrderService {
             {
               orderId: updatedOrder.id,
               newStatus,
-              trackingNumber: 'TRACKING_NUMBER',
+              trackingNumber: 'TRACKING_NUMBER', // Should be dynamic in production
               estimatedDelivery: new Date(Date.now() + 3 * 86400000).toDateString(),
             }
           );
