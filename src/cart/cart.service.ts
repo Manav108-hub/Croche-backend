@@ -199,13 +199,14 @@ export class CartService {
             product: {
               include: {
                 prices: true,
-                images: true
-              }
-            }
-          }
+                images: true, // use true instead of a select
+              },
+            },
+          },
         },
-        user: true
-      }
+        user: true,
+      },
     });
   }
+  
 }
