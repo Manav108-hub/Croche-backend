@@ -125,12 +125,16 @@ export class CartService {
       if (!cartItem?.cart || cartItem.cart.userId !== userId) {
         throw new ForbiddenException('Cart item not found');
       }
-
+  
       if (input.quantity < 1) {
         throw new ForbiddenException('Quantity must be at least 1');
       }
-
-      if (cartItem.product.stock < input.quantity) {
+  
+      // Calculate quantity difference
+      const quantityDifference = input.quantity - cartItem.quantity;
+      
+      // Only check stock if increasing quantity
+      if (quantityDifference > 0 && cartItem.product.stock < quantityDifference) {
         throw new ForbiddenException('Insufficient stock');
       }
       
@@ -138,7 +142,7 @@ export class CartService {
         where: { id: input.cartItemId },
         data: { quantity: input.quantity }
       });
-
+  
       return tx.cart.findUniqueOrThrow({
         where: { id: cartItem.cart.id },
         include: {
