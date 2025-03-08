@@ -1,0 +1,15 @@
+name = "croche-backend"
+main = "worker.ts"
+compatibility_date = "2023-10-30"
+node_compat = true
+
+[build]
+command = "pnpm build"
+
+[build.upload]
+format = "service-worker"
+
+# Your environment variables
+[vars]
+MONGODB_URI = ""
+RESEND_API_KEY = ""
