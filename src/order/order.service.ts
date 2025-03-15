@@ -140,7 +140,11 @@ export class OrderService {
       }
 
       return order;
-    });
+    },
+      {
+        timeout: 10000, // Increase the timeout to 10000 ms (10 seconds) or more
+      },
+    );
   }
 
   async updateOrderStatus(id: string, newStatus: OrderStatus): Promise<Order> {
