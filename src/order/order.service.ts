@@ -29,13 +29,13 @@ export class OrderService {
     return this.prisma.$transaction(async (prisma) => {
       // 1. Validate user and user details exist
       const [user, userDetails] = await Promise.all([
-        prisma.user.findUnique({ 
+        prisma.user.findUnique({
           where: { id: input.userId },
-          select: { id: true, email: true }
+          select: { id: true, email: true, name: true }
         }),
-        prisma.userDetails.findUnique({ 
+        prisma.userDetails.findUnique({
           where: { id: input.userDetailsId },
-          select: { id: true }
+          select: { id: true, address: true, city: true, pincode: true, country: true }
         }),
       ]);
 
@@ -73,11 +73,8 @@ export class OrderService {
       );
 
       // 3. Calculate total amount
-      const totalAmount = parseFloat(
-        itemsWithPrices
-          .reduce((sum, item) => sum + (item.price * item.quantity), 0)
-          .toFixed(2)
-      );
+      const totalAmount = itemsWithPrices
+        .reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
       // 4. Create order
       const order = await prisma.order.create({
@@ -97,10 +94,10 @@ export class OrderService {
             },
           },
         },
-        include: { 
-          items: true, 
+        include: {
+          items: true,
           userDetails: true,
-          user: { select: { email: true, id: true } } 
+          user: { select: { email: true, id: true } }
         },
       });
 
@@ -114,37 +111,40 @@ export class OrderService {
         )
       );
 
-      // 6. Send confirmation email
+      // 6. Send confirmation emails to customer and admin
       try {
-        await this.resendService.sendOrderConfirmationEmail(
+        const customerName = user.name;
+        const customerAddress = `${userDetails.address}, ${userDetails.city}, ${userDetails.pincode.toString()}, ${userDetails.country}`;
+
+        await this.resendService.sendOrderCreatedEmails(
           user.email,
           {
             orderId: order.id,
+            customerName,
+            customerAddress,
             products: itemsWithPrices.map(item => ({
               name: item.productName,
               quantity: item.quantity,
               price: item.price,
               size: item.size,
             })),
-            totalAmount: order.totalAmount,
+            totalAmount,
           }
         );
 
-        // Update emailSent flag if email was sent successfully
+        // Update emailSent flag if emails were sent successfully
         await prisma.order.update({
           where: { id: order.id },
           data: { emailSent: true },
         });
       } catch (emailError) {
-        this.logger.error(`Email failed for order ${order.id}: ${emailError.message}`);
+        this.logger.error(`Emails failed for order ${order.id}: ${emailError.message}`);
       }
 
       return order;
-    },
-      {
-        timeout: 10000, // Increase the timeout to 10000 ms (10 seconds) or more
-      },
-    );
+    }, {
+      timeout: 10000, // Increase the timeout to 10000 ms (10 seconds) or more
+    });
   }
 
   async updateOrderStatus(id: string, newStatus: OrderStatus): Promise<Order> {
@@ -166,7 +166,6 @@ export class OrderService {
 
       // 2. Handle stock updates for cancellations
       if (newStatus === OrderStatus.cancelled && order.status !== OrderStatus.cancelled) {
-        // Return items to stock when cancelling
         await Promise.all(
           order.items.map(item =>
             prisma.product.update({
@@ -176,7 +175,6 @@ export class OrderService {
           )
         );
       } else if (order.status === OrderStatus.cancelled && newStatus !== OrderStatus.cancelled) {
-        // Remove items from stock when un-cancelling
         await Promise.all(
           order.items.map(async item => {
             if (item.product.stock < item.quantity) {
