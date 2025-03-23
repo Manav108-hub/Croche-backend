@@ -23,6 +23,7 @@ import { OrderModule } from './order/order.module';
 import { ResendController } from './resend/resend.controller';
 import { ResendService } from './resend/resend.service';
 import { ResendModule } from './resend/resend.module';
+import { ExplorerModule } from './explorer/explorer.module';
 
 @Module({
   imports: [
@@ -43,7 +44,7 @@ import { ResendModule } from './resend/resend.module';
     PrismaModule, 
     AuthModule, 
     UserModule, 
-    ProductModule, ImageModule, OrderModule, ResendModule
+    ProductModule, ImageModule, OrderModule, ResendModule, ExplorerModule
   ],
   controllers: [AppController, ResendController],
   providers: [
