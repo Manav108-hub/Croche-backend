@@ -17,22 +17,63 @@ export class SecurityMiddleware implements NestMiddleware {
     });
 
     use(req: Request, res: Response, next: NextFunction) {
-        // Configure Helmet with settings that work with GraphQL
+        // Check if this is one of the GraphQL tool routes
+        const isToolRoute = req.path.includes('/api/explorer') || req.path.includes('/api/voyager');
+        
+        // For explorer/voyager routes, we need to completely disable CSP to make it work easily
+        if (isToolRoute) {
+            // Disable CSP entirely for the explorer/voyager routes
+            const helmetWithoutCsp = helmet({
+                contentSecurityPolicy: false
+            });
+            
+            helmetWithoutCsp(req, res, (err: any) => {
+                if (err) return next(err);
+                
+                mongoSanitize()(req, res, (err: any) => {
+                    if (err) return next(err);
+                    
+                    hpp()(req, res, (err: any) => {
+                        if (err) return next(err);
+                        
+                        cookieParser()(req, res, next);
+                    });
+                });
+            });
+            
+            return;
+        }
+
+        // For all other routes, use standard security settings
         const helmetMiddleware = helmet({
             crossOriginEmbedderPolicy: false,
             crossOriginResourcePolicy: false,
             contentSecurityPolicy: {
                 directives: {
                     defaultSrc: ["'self'"],
-                    scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-                    styleSrc: ["'self'", "'unsafe-inline'"],
+                    scriptSrc: [
+                        "'self'", 
+                        "'unsafe-inline'", 
+                        "'unsafe-eval'",
+                        "unpkg.com",
+                        "cdnjs.cloudflare.com",
+                        "cdn.jsdelivr.net"
+                    ],
+                    styleSrc: [
+                        "'self'", 
+                        "'unsafe-inline'",
+                        "unpkg.com",
+                        "cdnjs.cloudflare.com",
+                        "cdn.jsdelivr.net"
+                    ],
                     imgSrc: ["'self'", "data:", "https:"],
                     connectSrc: ["'self'", "https:", "wss:"],
+                    fontSrc: ["'self'", "https:", "data:"]
                 }
             }
         });
 
-        // Chain middleware with proper error handling
+        // Standard security for non-tool routes
         helmetMiddleware(req, res, (err: any) => {
             if (err) return next(err);
 
@@ -45,7 +86,6 @@ export class SecurityMiddleware implements NestMiddleware {
                     this.rateLimiter(req, res, (err: any) => {
                         if (err) return next(err);
 
-                        // Set CORS headers after security headers
                         if (req.method === 'OPTIONS') {
                             res.setHeader('Access-Control-Max-Age', '3600');
                             res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
@@ -58,7 +98,6 @@ export class SecurityMiddleware implements NestMiddleware {
                             return;
                         }
 
-                        // Parse cookies last to ensure all security checks are done first
                         cookieParser()(req, res, next);
                     });
                 });

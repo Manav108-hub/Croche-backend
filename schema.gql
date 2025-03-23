@@ -160,6 +160,18 @@ type Product {
   updatedAt: DateTime!
 }
 
+input ProductFilterInput {
+  category: String
+  ids: [String!]
+  inStock: Boolean
+  limit: Int
+  maxPrice: Int
+  minPrice: Int
+  search: String
+  sizes: [Size!]
+  skip: Int
+}
+
 type ProductImage {
   createdAt: DateTime!
   format: String!
@@ -171,6 +183,7 @@ type ProductImage {
 }
 
 type Query {
+  filteredProducts(filter: ProductFilterInput!): [Product!]!
   getCart(userId: String!): Cart
   me: User!
   order(id: ID!): Order
