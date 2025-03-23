@@ -6,6 +6,7 @@ import { GqlAuthGuard } from 'src/auth/guards/gql-auth.guard';
 import { AdminGuard } from 'src/common/guards/admin.guard';
 import { CreateProductInput } from './dto/create-product.input';
 import { UpdateProductInput } from './dto/update-product.input';
+import { ProductFilterInput } from './dto/filter-product.input';
 
 @Resolver(() => Product)
 export class ProductResolver {
@@ -19,6 +20,11 @@ export class ProductResolver {
     @Query(() => Product)
     async product(@Args('id') id: string) {
         return this.productService.findOne(id);
+    }
+
+    @Query(() => [Product], { name: 'filteredProducts' })
+    async getFilteredProducts(@Args('filter') filter: ProductFilterInput) {
+        return this.productService.findFiltered(filter);
     }
 
     @Mutation(() => Product)
